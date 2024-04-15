@@ -1,0 +1,68 @@
+from skimage import io, color, morphology, measure
+import numpy as np
+import matplotlib.pyplot as plt
+
+def detect_hand(image_path):
+    # Load the image
+    image = io.imread(image_path)
+
+    # Check if the image is already in grayscale, if not convert it to RGB
+    if image.ndim == 3 and image.shape[2] == 4:
+        image = color.rgba2rgb(image)
+
+    # Convert to HSV and detect skin tone range
+    hsv_img = color.rgb2hsv(image)
+    # These thresholds are for skin tone detection
+    lower_skin = np.array([0.05, 0.2, 0.2])
+    upper_skin = np.array([0.25, 0.7, 0.8])
+    skin_mask = ((hsv_img[:,:,0] > lower_skin[0]) & (hsv_img[:,:,0] < upper_skin[0]) &
+                 (hsv_img[:,:,1] > lower_skin[1]) & (hsv_img[:,:,1] < upper_skin[1]) &
+                 (hsv_img[:,:,2] > lower_skin[2]) & (hsv_img[:,:,2] < upper_skin[2]))
+
+    # Apply morphological operations to clean up the mask
+    cleaned_mask = morphology.remove_small_objects(skin_mask, min_size=500)
+    cleaned_mask = morphology.closing(cleaned_mask, morphology.disk(7))
+
+    # Label connected regions
+    labeled_mask = measure.label(cleaned_mask)
+    regions = measure.regionprops(labeled_mask)
+
+    # Initialize variables to find the bounding box of the combined regions
+    min_row, min_col, max_row, max_col = (np.inf, np.inf, -np.inf, -np.inf)
+
+    # Loop over each region to combine regions within the area range and find the overall bounding box
+    for region in regions:
+        if region.area <= 3000:
+            min_row = min(min_row, region.bbox[0])
+            min_col = min(min_col, region.bbox[1])
+            max_row = max(max_row, region.bbox[2])
+            max_col = max(max_col, region.bbox[3])
+
+    # Display the original image with the combined region highlighted
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.imshow(image)
+
+    # Check if the bounding box coordinates have been updated
+    if max_row > min_row and max_col > min_col:
+        # Draw rectangle around the combined region
+        hand_detected = True
+        rect = plt.Rectangle((min_col, min_row), max_col - min_col, max_row - min_row, edgecolor='red', linewidth=2, fill=False)
+        ax.add_patch(rect)
+        ax.set_axis_off()
+        plt.show()
+    else:
+        hand_detected = False
+        print("No hand detected.")
+      
+
+    plt.close()
+    
+    return hand_detected
+
+
+image_path = 'no.jpg'
+has_hand = detect_hand(image_path)
+if has_hand:
+    print(f"Hand detected")
+else:
+    print("No hand was detected in the image.")
