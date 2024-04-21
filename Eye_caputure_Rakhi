@@ -1,0 +1,77 @@
+import skimage
+from skimage import io, transform
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib as mt
+import math
+
+import warnings
+warnings.simplefilter("ignore")
+
+def NCC(patch, template):
+    row, column = template.shape[0], template.shape[1]        
+    NCC_r = np.sum(((patch[:,:,0] - np.mean(patch[:,:,0])) * (template[:,:,0]- temp_mean[:,:,0]))/(np.std(patch[:,:,0], ddof=1) * temp_std[0]))
+    NCC_g = np.sum(((patch[:,:,1] - np.mean(patch[:,:,1])) * (template[:,:,1]- temp_mean[:,:,1]))/(np.std(patch[:,:,1], ddof=1) * temp_std[1]))
+    NCC_b = np.sum(((patch[:,:,2] - np.mean(patch[:,:,2])) * (template[:,:,2]- temp_mean[:,:,2]))/(np.std(patch[:,:,2], ddof=1) * temp_std[2]))
+    NCC   = NCC_r + NCC_g + NCC_b
+    NCC  = NCC / ((s_row * s_col)- 1)
+    
+    return NCC
+
+def plot_match(index, position):
+    match = search[int(sorted_patch_ncc[index, 1]):int(sorted_patch_ncc[index, 1]) + temp_row, int(sorted_patch_ncc[index, 0]):int(sorted_patch_ncc[index, 0]) + temp_col]
+    ax = fig.add_subplot(2, 3, position)
+    ax.imshow(match)
+    plt.title(f"k = {index + 1} \n Location = ({int(sorted_patch_ncc[index, 1] + temp_row/2)}, {int(sorted_patch_ncc[index, 0] + temp_col/2)})")
+    plt.axis("off")
+    
+    
+s = io.imread('no2.jpg')
+t = io.imread('template_eye.png')
+
+scale_factor = 0.3
+
+# Downscale the image using the rescale function
+search = transform.rescale(s, scale_factor, anti_aliasing=True, multichannel=True)
+template= transform.rescale(t, scale_factor, anti_aliasing=True, multichannel=True)
+
+
+print(search.shape)
+print(template.shape)
+
+temp_row, temp_col = template.shape[0], template.shape[1]
+s_row, s_col = search.shape[0], search.shape[1]
+
+temp_mean = np.mean(template, axis=(0, 1), keepdims=True)
+temp_std = np.std(template, axis=(0, 1), ddof=1)
+
+
+patch_ncc = []
+
+for i in range(s_row - temp_row):
+    for j in range(s_col - temp_col):
+        patch = search[i:i+temp_row, j:j+temp_col]
+        ncc_ = NCC(patch, template)
+        patch_ncc.append([j, i, ncc_])
+
+
+patch_ncc.sort(reverse=True, key=lambda x: x[2])
+sorted_patch_ncc = np.array(patch_ncc)
+
+
+ncc_plot = pd.Series(sorted_patch_ncc[:, 2])
+ncc_plot.plot.line(xlabel='k', ylabel='NCC')
+
+
+
+
+fig = plt.figure(figsize=(30, 10))
+plot_match(0, 1)
+plot_match(1, 2)
+plot_match(4, 3)
+plot_match(9, 4)
+plot_match(99, 5)
+plot_match(499, 6)
+
+plt.show()
